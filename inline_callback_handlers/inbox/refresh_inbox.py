@@ -40,12 +40,12 @@ def refresh_inbox(bot: TeleBot, chat_id: int, msg_id: int, button_data: str):
             if prev_temps == len(temp_inbox):
                 result_msg = (
                     f"Active Email: <code>{temp_mail}</code>\nTotal Inbox Mails: <b>{len(temp_inbox)}</b>\n\n<b><i>No New Inbox</i></b>\n\n"
-                    + "\n".join(temp_inbox_list)
+                    + "\n\n".join(temp_inbox_list)
                 )
             else:
                 result_msg = (
                     f"Active Email: <code>{temp_mail}</code>\nTotal Inbox Mails: <b>{len(temp_inbox)}</b>\n\n"
-                    + "\n".join(temp_inbox_list)
+                    + "\n\n".join(temp_inbox_list)
                 )
             bot.edit_message_text(
                 result_msg,
