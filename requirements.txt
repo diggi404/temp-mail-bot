@@ -1,0 +1,5 @@
+SQLAlchemy
+pyTelegramBotAPI
+psycopg2
+pysocks
+python-dotenv
