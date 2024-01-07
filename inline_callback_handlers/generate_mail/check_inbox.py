@@ -3,7 +3,12 @@ import requests
 
 
 def gen_check_inbox(
-    bot: TeleBot, chat_id: int, msg_id: int, button_data: str, total_inbox_dict: dict
+    bot: TeleBot,
+    chat_id: int,
+    msg_id: int,
+    button_data: str,
+    total_inbox_dict: dict,
+    call_id: int,
 ):
     temp_mail = button_data.split("_")[1]
     login_name, domain = temp_mail.split("@")
@@ -17,6 +22,9 @@ def gen_check_inbox(
         )
     else:
         temp_inbox = get_inbox.json()
+        if len(temp_inbox) == 0:
+            bot.answer_callback_query(call_id, "Your inbox is empty.", show_alert=True)
+            return
         inbox_markup = types.InlineKeyboardMarkup()
         inbox_btn1 = types.InlineKeyboardButton(
             "View Message", callback_data="view inbox message"

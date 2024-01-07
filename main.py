@@ -89,7 +89,7 @@ def handle_callback_query(call: types.CallbackQuery):
         change_mail(bot, chat_id, msg_id, db_session, button_data, duplicate_mails)
 
     elif button_data.startswith("check inbox_"):
-        gen_check_inbox(bot, chat_id, msg_id, button_data, total_inbox_dict)
+        gen_check_inbox(bot, chat_id, msg_id, button_data, total_inbox_dict, call.id)
 
     elif button_data == "no don't download":
         bot.edit_message_text("Attachment download aborted.", chat_id, msg_id)
