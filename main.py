@@ -31,6 +31,8 @@ def handle_start(message: types.Message):
     chat_id = message.from_user.id
     name = message.from_user.full_name
     username = message.from_user.username
+    if chat_id not in total_inbox_dict:
+        total_inbox_dict[chat_id] = 0
     get_user = (
         db_session.query(TempMailUsers).filter(TempMailUsers.id == chat_id).first()
     )
@@ -71,6 +73,8 @@ def handle_callback_query(call: types.CallbackQuery):
     button_data = call.data
     chat_id = call.from_user.id
     msg_id = call.message.id
+    if chat_id not in total_inbox_dict:
+        total_inbox_dict[chat_id] = 0
 
     if button_data == "remove message":
         bot.delete_message(chat_id, msg_id)
@@ -99,6 +103,8 @@ def handle_callback_query(call: types.CallbackQuery):
 @bot.message_handler(func=lambda message: message.text == "Get New Email")
 def handle_new_email(message: types.Message):
     chat_id = message.from_user.id
+    if chat_id not in total_inbox_dict:
+        total_inbox_dict[chat_id] = 0
     try:
         get_emails = requests.get(
             "https://www.1secmail.com/api/v1/?action=genRandomMailbox&count=10"
@@ -197,6 +203,8 @@ def incoming_inbox(
 @bot.message_handler(func=lambda message: message.text == "Check Inbox")
 def handle_check_inbox(message: types.Message):
     chat_id = message.from_user.id
+    if chat_id not in total_inbox_dict:
+        total_inbox_dict[chat_id] = 0
     get_user = (
         db_session.query(TempMailUsers).filter(TempMailUsers.id == chat_id).first()
     )
@@ -251,6 +259,8 @@ def handle_check_inbox(message: types.Message):
 
 @bot.message_handler(func=lambda message: message.text == "Show Current Email")
 def show_current_email(message: types.Message):
+    if chat_id not in total_inbox_dict:
+        total_inbox_dict[chat_id] = 0
     chat_id = message.from_user.id
     get_user = (
         db_session.query(TempMailUsers).filter(TempMailUsers.id == chat_id).first()
@@ -268,6 +278,9 @@ def show_current_email(message: types.Message):
 
 @bot.message_handler(func=lambda message: message.text == "Support")
 def handle_support(message: types.Message):
+    chat_id = message.from_user.id
+    if chat_id not in total_inbox_dict:
+        total_inbox_dict[chat_id] = 0
     bot.send_message(message.from_user.id, "Contact support here @yeptg")
 
 
