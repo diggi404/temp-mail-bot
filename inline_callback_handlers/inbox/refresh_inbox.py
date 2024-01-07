@@ -45,7 +45,7 @@ def refresh_inbox(
             ]
             if prev_temps == len(temp_inbox):
                 bot.answer_callback_query(
-                    call_id, "No new messages yet", show_alert=True
+                    call_id, "No new messages yet.", show_alert=True
                 )
             else:
                 result_msg = (
