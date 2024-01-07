@@ -52,7 +52,8 @@ def refresh_inbox(
                     f"Active Email: <code>{temp_mail}</code>\nTotal Inbox Mails: <b>{len(temp_inbox)}</b>\n\n"
                     + "\n\n".join(temp_inbox_list)
                 )
-                total_inbox_dict[chat_id] += len(temp_inbox)
+                if total_inbox_dict[chat_id] != len(temp_inbox):
+                    total_inbox_dict[chat_id] += len(temp_inbox)
                 bot.edit_message_text(
                     result_msg,
                     chat_id,
