@@ -226,6 +226,9 @@ def handle_check_inbox(message: types.Message):
             )
         else:
             temp_inbox = get_inbox.json()
+            if len(temp_inbox) == 0:
+                bot.send_message(chat_id, "Your inbox is empty.")
+                return
             inbox_markup = types.InlineKeyboardMarkup()
             inbox_btn1 = types.InlineKeyboardButton(
                 "View Message", callback_data="view inbox message"
