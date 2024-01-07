@@ -155,7 +155,7 @@ def handle_new_email(message: types.Message):
                     )
                     thread = Thread(
                         target=incoming_inbox,
-                        args=(chat_id, bot, 2, user_temp_mail, total_inbox_dict),
+                        args=(chat_id, bot, 2, total_inbox_dict),
                     )
                     thread.start()
 
