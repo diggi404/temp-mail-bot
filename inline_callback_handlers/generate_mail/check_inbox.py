@@ -36,7 +36,7 @@ def gen_check_inbox(
         ]
         result_msg = (
             f"Active Email: <code>{temp_mail}</code>\nTotal Inbox Mails: <b>{len(temp_inbox)}</b>\n\n"
-            + "\n".join(temp_inbox_list)
+            + "\n\n".join(temp_inbox_list)
         )
         if total_inbox_dict[chat_id] != len(temp_inbox):
             total_inbox_dict[chat_id] += len(temp_inbox)
