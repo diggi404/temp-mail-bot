@@ -2,7 +2,9 @@ from telebot import TeleBot, types
 import requests
 
 
-def gen_check_inbox(bot: TeleBot, chat_id: int, msg_id: int, button_data: str):
+def gen_check_inbox(
+    bot: TeleBot, chat_id: int, msg_id: int, button_data: str, total_inbox_dict: dict
+):
     temp_mail = button_data.split("_")[1]
     login_name, domain = temp_mail.split("@")
     try:
@@ -36,6 +38,7 @@ def gen_check_inbox(bot: TeleBot, chat_id: int, msg_id: int, button_data: str):
             f"Active Email: <code>{temp_mail}</code>\nTotal Inbox Mails: <b>{len(temp_inbox)}</b>\n\n"
             + "\n".join(temp_inbox_list)
         )
+        total_inbox_dict[chat_id] += len(temp_inbox)
         bot.edit_message_text(
             result_msg, chat_id, msg_id, parse_mode="HTML", reply_markup=inbox_markup
         )

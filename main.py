@@ -1,11 +1,14 @@
+import time
 from telebot import types, TeleBot
 import os
+from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 from keyboards import hard_buttons
 from database.conn import db_session
 from database.models import TempMailUsers
 import requests
 from datetime import datetime
+from threading import Thread
 
 load_dotenv()
 
@@ -20,6 +23,7 @@ from inline_callback_handlers.generate_mail.check_inbox import gen_check_inbox
 bot = TeleBot(os.getenv("BOT_TOKEN"))
 
 duplicate_mails = dict()
+total_inbox_dict = dict()
 
 
 @bot.message_handler(commands=["start"])
@@ -75,13 +79,13 @@ def handle_callback_query(call: types.CallbackQuery):
         view_message(bot, chat_id, msg_id, db_session)
 
     elif button_data.startswith("refresh inbox_"):
-        refresh_inbox(bot, chat_id, msg_id, button_data)
+        refresh_inbox(bot, chat_id, msg_id, button_data, call.id, total_inbox_dict)
 
     elif button_data.startswith("get new temp mail_"):
         change_mail(bot, chat_id, msg_id, db_session, button_data, duplicate_mails)
 
     elif button_data.startswith("check inbox_"):
-        gen_check_inbox(bot, chat_id, msg_id, button_data)
+        gen_check_inbox(bot, chat_id, msg_id, button_data, total_inbox_dict)
 
     elif button_data == "no don't download":
         bot.edit_message_text("Attachment download aborted.", chat_id, msg_id)
@@ -104,6 +108,7 @@ def handle_new_email(message: types.Message):
             chat_id, "Bot can't generate emails right now. Please try again."
         )
     else:
+        total_inbox_dict[chat_id] = 0
         if get_emails.status_code == 200:
             temp_list = get_emails.json()
             check_temp = [
@@ -142,10 +147,51 @@ def handle_new_email(message: types.Message):
                         reply_markup=gen_email_markup,
                         parse_mode="HTML",
                     )
+                    thread = Thread(
+                        target=incoming_inbox,
+                        args=(chat_id, bot, 2, user_temp_mail, total_inbox_dict),
+                    )
+                    thread.start()
+
         else:
             bot.send_message(
                 chat_id, "Bot can't generate emails right now. Please try again."
             )
+
+
+def incoming_inbox(
+    chat_id: int,
+    bot: TeleBot,
+    delay: int,
+    temp_mail: str,
+    total_inbox_dict: dict,
+):
+    login_name, domain = temp_mail.split("@")
+    if chat_id not in total_inbox_dict:
+        total_inbox_dict[chat_id] = 0
+    while True:
+        try:
+            get_inbox = requests.get(
+                f"https://www.1secmail.com/api/v1/?action=getMessages&login={login_name}&domain={domain}"
+            )
+        except:
+            pass
+        else:
+            if len(get_inbox.json()) > total_inbox_dict[chat_id]:
+                markup = types.InlineKeyboardMarkup()
+                btn = types.InlineKeyboardButton(
+                    "Check Inbox 📨", callback_data=f"check inbox_{temp_mail}"
+                )
+                markup.add(btn)
+                bot.send_message(
+                    chat_id,
+                    "<b>New Inbox Message Alert 💬</b>",
+                    reply_markup=markup,
+                    parse_mode="HTML",
+                )
+                new_inboxes = len(get_inbox.json()) - total_inbox_dict[chat_id]
+                total_inbox_dict[chat_id] += new_inboxes
+            time.sleep(delay)
 
 
 @bot.message_handler(func=lambda message: message.text == "Check Inbox")
