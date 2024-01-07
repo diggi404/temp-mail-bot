@@ -169,13 +169,17 @@ def incoming_inbox(
     chat_id: int,
     bot: TeleBot,
     delay: int,
-    temp_mail: str,
     total_inbox_dict: dict,
 ):
-    login_name, domain = temp_mail.split("@")
     if chat_id not in total_inbox_dict:
         total_inbox_dict[chat_id] = 0
     while True:
+        temp_mail = (
+            db_session.query(TempMailUsers.email)
+            .filter(TempMailUsers.id == chat_id)
+            .first()
+        )
+        login_name, domain = temp_mail[0].split("@")
         try:
             get_inbox = requests.get(
                 f"https://www.1secmail.com/api/v1/?action=getMessages&login={login_name}&domain={domain}"
@@ -186,7 +190,7 @@ def incoming_inbox(
             if len(get_inbox.json()) > total_inbox_dict[chat_id]:
                 markup = types.InlineKeyboardMarkup()
                 btn = types.InlineKeyboardButton(
-                    "Check Inbox 📨", callback_data=f"check inbox_{temp_mail}"
+                    "Check Inbox 📨", callback_data=f"check inbox_{temp_mail[0]}"
                 )
                 markup.add(btn)
                 bot.send_message(
