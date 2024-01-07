@@ -46,8 +46,6 @@ def gen_check_inbox(
             f"Active Email: <code>{temp_mail}</code>\nTotal Inbox Mails: <b>{len(temp_inbox)}</b>\n\n"
             + "\n\n".join(temp_inbox_list)
         )
-        if total_inbox_dict[chat_id] != len(temp_inbox):
-            total_inbox_dict[chat_id] += len(temp_inbox)
         bot.edit_message_text(
             result_msg, chat_id, msg_id, parse_mode="HTML", reply_markup=inbox_markup
         )
