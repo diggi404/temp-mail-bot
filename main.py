@@ -31,8 +31,6 @@ def handle_start(message: types.Message):
     chat_id = message.from_user.id
     name = message.from_user.full_name
     username = message.from_user.username
-    if chat_id not in total_inbox_dict:
-        total_inbox_dict[chat_id] = 0
     get_user = (
         db_session.query(TempMailUsers).filter(TempMailUsers.id == chat_id).first()
     )
@@ -73,8 +71,6 @@ def handle_callback_query(call: types.CallbackQuery):
     button_data = call.data
     chat_id = call.from_user.id
     msg_id = call.message.id
-    if chat_id not in total_inbox_dict:
-        total_inbox_dict[chat_id] = 0
 
     if button_data == "remove message":
         bot.delete_message(chat_id, msg_id)
@@ -83,13 +79,13 @@ def handle_callback_query(call: types.CallbackQuery):
         view_message(bot, chat_id, msg_id, db_session)
 
     elif button_data.startswith("refresh inbox_"):
-        refresh_inbox(bot, chat_id, msg_id, button_data, call.id, total_inbox_dict)
+        refresh_inbox(bot, chat_id, msg_id, button_data, call.id)
 
     elif button_data.startswith("get new temp mail_"):
         change_mail(bot, chat_id, msg_id, db_session, button_data, duplicate_mails)
 
     elif button_data.startswith("check inbox_"):
-        gen_check_inbox(bot, chat_id, msg_id, button_data, total_inbox_dict, call.id)
+        gen_check_inbox(bot, chat_id, msg_id, button_data, call.id)
 
     elif button_data == "no don't download":
         bot.edit_message_text("Attachment download aborted.", chat_id, msg_id)
@@ -103,8 +99,6 @@ def handle_callback_query(call: types.CallbackQuery):
 @bot.message_handler(func=lambda message: message.text == "Get New Email")
 def handle_new_email(message: types.Message):
     chat_id = message.from_user.id
-    if chat_id not in total_inbox_dict:
-        total_inbox_dict[chat_id] = 0
     try:
         get_emails = requests.get(
             "https://www.1secmail.com/api/v1/?action=genRandomMailbox&count=10"
@@ -114,7 +108,6 @@ def handle_new_email(message: types.Message):
             chat_id, "Bot can't generate emails right now. Please try again."
         )
     else:
-        total_inbox_dict[chat_id] = 0
         if get_emails.status_code == 200:
             temp_list = get_emails.json()
             check_temp = [
@@ -171,8 +164,6 @@ def incoming_inbox(
     delay: int,
     total_inbox_dict: dict,
 ):
-    if chat_id not in total_inbox_dict:
-        total_inbox_dict[chat_id] = 0
     while True:
         temp_mail = (
             db_session.query(TempMailUsers.email)
@@ -180,6 +171,8 @@ def incoming_inbox(
             .first()
         )
         login_name, domain = temp_mail[0].split("@")
+        if temp_mail not in total_inbox_dict:
+            total_inbox_dict[temp_mail] = 0
         try:
             get_inbox = requests.get(
                 f"https://www.1secmail.com/api/v1/?action=getMessages&login={login_name}&domain={domain}"
@@ -187,7 +180,7 @@ def incoming_inbox(
         except:
             pass
         else:
-            if len(get_inbox.json()) > total_inbox_dict[chat_id]:
+            if len(get_inbox.json()) > total_inbox_dict[temp_mail]:
                 markup = types.InlineKeyboardMarkup()
                 btn = types.InlineKeyboardButton(
                     "Check Inbox 📨", callback_data=f"check inbox_{temp_mail[0]}"
@@ -199,16 +192,14 @@ def incoming_inbox(
                     reply_markup=markup,
                     parse_mode="HTML",
                 )
-                new_inboxes = len(get_inbox.json()) - total_inbox_dict[chat_id]
-                total_inbox_dict[chat_id] += new_inboxes
+                new_inboxes = len(get_inbox.json()) - total_inbox_dict[temp_mail]
+                total_inbox_dict[temp_mail] += new_inboxes
             time.sleep(delay)
 
 
 @bot.message_handler(func=lambda message: message.text == "Check Inbox")
 def handle_check_inbox(message: types.Message):
     chat_id = message.from_user.id
-    if chat_id not in total_inbox_dict:
-        total_inbox_dict[chat_id] = 0
     get_user = (
         db_session.query(TempMailUsers).filter(TempMailUsers.id == chat_id).first()
     )
@@ -266,8 +257,6 @@ def handle_check_inbox(message: types.Message):
 
 @bot.message_handler(func=lambda message: message.text == "Show Current Email")
 def show_current_email(message: types.Message):
-    if chat_id not in total_inbox_dict:
-        total_inbox_dict[chat_id] = 0
     chat_id = message.from_user.id
     get_user = (
         db_session.query(TempMailUsers).filter(TempMailUsers.id == chat_id).first()
@@ -286,8 +275,6 @@ def show_current_email(message: types.Message):
 @bot.message_handler(func=lambda message: message.text == "Support")
 def handle_support(message: types.Message):
     chat_id = message.from_user.id
-    if chat_id not in total_inbox_dict:
-        total_inbox_dict[chat_id] = 0
     bot.send_message(message.from_user.id, "Contact support here @yeptg")
 
 

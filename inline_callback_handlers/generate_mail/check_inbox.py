@@ -7,7 +7,6 @@ def gen_check_inbox(
     chat_id: int,
     msg_id: int,
     button_data: str,
-    total_inbox_dict: dict,
     call_id: int,
 ):
     temp_mail = button_data.split("_")[1]

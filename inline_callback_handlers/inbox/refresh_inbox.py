@@ -9,7 +9,6 @@ def refresh_inbox(
     msg_id: int,
     button_data: str,
     call_id: int,
-    total_inbox_dict: dict,
 ):
     temp_mail = button_data.split("_")[2]
     prev_temps = button_data.split("_")[1]
