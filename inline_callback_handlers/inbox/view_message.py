@@ -3,10 +3,11 @@ from sqlalchemy.orm import Session
 from database.models import TempMailUsers
 import requests
 import os
+from weasyprint import HTML
 
 
 def view_message(bot: TeleBot, chat_id: int, msg_id: int, db_session: Session):
-    take_msg = bot.send_message(chat_id, "Enter the message id: ")
+    take_msg = bot.send_message(chat_id, "Enter the message #: ")
     bot.register_next_step_handler(
         take_msg, lambda message: step_view_message(message, bot, db_session, msg_id)
     )
@@ -15,6 +16,39 @@ def view_message(bot: TeleBot, chat_id: int, msg_id: int, db_session: Session):
 def step_view_message(
     message: types.Message, bot: TeleBot, db_session: Session, major_msg_id: int
 ):
+    css_style = """
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
+        .email {
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin: 10px auto;
+            padding: 20px;
+            max-width: 600px;
+        }
+        .email h3 {
+            margin-top: 0;
+        }
+        .email p {
+            margin: 5px 0;
+        }
+        .email .from {
+            font-weight: bold;
+        }
+        .email .attachments {
+            color: #777;
+        }
+        .email .message {
+            margin-top: 20px;
+        }
+    </style>
+    """
     chat_id = message.from_user.id
     msg = message.text
     try:
@@ -40,16 +74,46 @@ def step_view_message(
                     bot.send_message(chat_id, "Message content can't be found.")
                 else:
                     msg_details = get_inbox_msg.json()
-                    with open(f"{inbox_msg_id}.html", "w") as content:
-                        content.write(msg_details["body"])
-                    bot.send_message(
-                        chat_id,
-                        f"From: <code>{msg_details['from']}</code>\nSubject: <b>{msg_details['subject']}</b>\nDate: <b>{msg_details['date']}</b>",
-                        parse_mode="HTML",
-                    )
-                    with open(f"{inbox_msg_id}.html", "rb") as document:
+                    subject = msg_details["subject"]
+                    main_body = msg_details["body"]
+                    from_mail = msg_details["from"]
+                    date = msg_details["date"]
+                    num_at = len(msg_details["attachments"])
+                    try:
+                        HTML(
+                            string=f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Inbox</title>
+    {css_style}
+</head>
+<body>
+    <div class="email">
+        <p class="from">From: &lt;{from_mail}&gt;</p>
+        <p> Subject: {subject}</p>
+        <p>Date: {date}</p>
+        <p>Attachments: {num_at}</p>
+        <div class="message">
+            <p>{main_body}</p>
+        </div>
+    </div>
+</body>
+</html>
+                         """
+                        ).write_pdf(f"{subject}.pdf")
+                    except Exception as e:
+                        print(e)
+                    # bot.send_message(
+                    #     chat_id,
+                    #     f"From: <code>{msg_details['from']}</code>\nSubject: <b>{msg_details['subject']}</b>\nDate: <b>{msg_details['date']}</b>",
+                    #     parse_mode="HTML",
+                    # )
+                    with open(f"{subject}.pdf", "rb") as document:
                         bot.send_document(chat_id, document)
-                    os.remove(f"{inbox_msg_id}.html")
+                    os.remove(f"{subject}.pdf")
                     if len(msg_details["attachments"]) != 0:
                         attachments = msg_details["attachments"]
                         bot.send_message(

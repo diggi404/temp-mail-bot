@@ -6,13 +6,7 @@ import os
 
 load_dotenv()
 
-url = URL.create(
-    drivername="postgresql",
-    host=os.getenv("HOST"),
-    password=os.getenv("PASSWORD"),
-    database=os.getenv("DATABASE"),
-    username=os.getenv("USER"),
-)
+url = os.getenv("DATABASE_URI")
 
 engine = create_engine(url)
 

@@ -2,13 +2,14 @@ import time
 from telebot import types, TeleBot
 import os
 from sqlalchemy.orm import Session
+from sqlalchemy import exists
 from dotenv import load_dotenv
 from keyboards import hard_buttons
 from database.conn import db_session
 from database.models import TempMailUsers
 import requests
 from datetime import datetime
-from threading import Thread
+from threading import Thread, Lock
 
 load_dotenv()
 
@@ -20,10 +21,13 @@ from inline_callback_handlers.inbox.refresh_inbox import refresh_inbox
 from inline_callback_handlers.generate_mail.change_mail import change_mail
 from inline_callback_handlers.generate_mail.check_inbox import gen_check_inbox
 
+from inline_callback_handlers.toggle_alert import toggle_alert
+
 bot = TeleBot(os.getenv("BOT_TOKEN"))
 
 duplicate_mails = dict()
-total_inbox_dict = dict()
+alert_check = dict()
+alert_dict = dict()
 
 
 @bot.message_handler(commands=["start"])
@@ -31,13 +35,11 @@ def handle_start(message: types.Message):
     chat_id = message.from_user.id
     name = message.from_user.full_name
     username = message.from_user.username
-    get_user = (
-        db_session.query(TempMailUsers).filter(TempMailUsers.id == chat_id).first()
-    )
+    get_user = db_session.query(exists().where(TempMailUsers.id == chat_id)).scalar()
     if get_user:
         bot.send_message(
             chat_id,
-            f"<i>Welcome <b>{name}</b> to our free disposable email service. Get unlimited number of temporal mails without any cost 🥳. Don't hesitate to contact support if you experience any issues.</i>",
+            f"👋 Hey {name} happy to see you again. Always use disposable emails when necessary to avoid email spams.",
             parse_mode="HTML",
             reply_markup=hard_buttons.main_markup,
         )
@@ -61,9 +63,42 @@ def handle_start(message: types.Message):
             else:
                 bot.send_message(
                     chat_id,
-                    f"Welcome {name} to our free disapoble email service.",
+                    f"Welcome {name}, you are making the right choice. Generate your new disposable mail and let me handle the rest for you 😃",
                     reply_markup=hard_buttons.main_markup,
                 )
+
+    if "alert_started" not in alert_check:
+        alert_check["alert_started"] = "on"
+        all_users = (
+            db_session.query(TempMailUsers)
+            .filter(TempMailUsers.email.is_not(None))
+            .all()
+        )
+        for user in all_users:
+            login_name, domain = user.email.split("@")
+            try:
+                get_inbox = requests.get(
+                    f"https://www.1secmail.com/api/v1/?action=getMessages&login={login_name}&domain={domain}"
+                )
+            except:
+                continue
+            else:
+                alert_dict[user.id] = {
+                    "email": user.email,
+                    "alert": user.alert,
+                    "count": len(get_inbox.json()),
+                }
+                time.sleep(1)
+        threads = list()
+        lock = Lock()
+        for i in range(1):
+            t = Thread(target=alert_system, args=(lock,))
+            threads.append(t)
+
+        for t in threads:
+            t.start()
+
+        bot.send_message(1172097366, "Alert system is up.")
 
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -79,13 +114,15 @@ def handle_callback_query(call: types.CallbackQuery):
         view_message(bot, chat_id, msg_id, db_session)
 
     elif button_data.startswith("refresh inbox_"):
-        refresh_inbox(bot, chat_id, msg_id, button_data, call.id)
+        refresh_inbox(bot, chat_id, msg_id, button_data, call.id, alert_dict)
 
     elif button_data.startswith("get new temp mail_"):
-        change_mail(bot, chat_id, msg_id, db_session, button_data, duplicate_mails)
+        change_mail(
+            bot, chat_id, msg_id, db_session, button_data, duplicate_mails, alert_dict
+        )
 
     elif button_data.startswith("check inbox_"):
-        gen_check_inbox(bot, chat_id, msg_id, button_data, call.id)
+        gen_check_inbox(bot, chat_id, msg_id, button_data, call.id, alert_dict)
 
     elif button_data == "no don't download":
         bot.edit_message_text("Attachment download aborted.", chat_id, msg_id)
@@ -93,10 +130,13 @@ def handle_callback_query(call: types.CallbackQuery):
     elif button_data.startswith("yes download_"):
         download_attachment(bot, chat_id, msg_id, button_data)
 
+    elif button_data == "toggle message alert":
+        toggle_alert(bot, chat_id, msg_id, db_session, alert_dict)
+
     bot.answer_callback_query(call.id)
 
 
-@bot.message_handler(func=lambda message: message.text == "Get New Email")
+@bot.message_handler(func=lambda message: message.text == "Get New Email ➕")
 def handle_new_email(message: types.Message):
     chat_id = message.from_user.id
     try:
@@ -142,62 +182,56 @@ def handle_new_email(message: types.Message):
                 else:
                     bot.send_message(
                         chat_id,
-                        f"New Mail: <code>{user_temp_mail}</code>",
+                        f"➖➖FRESH MAIL➖➖\n\nNew Mail: <code>{user_temp_mail}</code>\nIncoming Message Alert: <b>ON ✅</b>\n\n<i>You can always go to [settings] to see your current mail and toggle message alert mode.</i>",
                         reply_markup=gen_email_markup,
                         parse_mode="HTML",
                     )
-                    thread = Thread(
-                        target=incoming_inbox,
-                        args=(chat_id, bot, 2, total_inbox_dict),
-                    )
-                    thread.start()
-
+                    alert_dict[chat_id] = {
+                        "email": user_temp_mail,
+                        "alert": True,
+                        "count": 0,
+                    }
         else:
             bot.send_message(
                 chat_id, "Bot can't generate emails right now. Please try again."
             )
 
 
-def incoming_inbox(
-    chat_id: int,
-    bot: TeleBot,
-    delay: int,
-    total_inbox_dict: dict,
-):
+def alert_system(lock: Lock):
     while True:
-        temp_mail = (
-            db_session.query(TempMailUsers.email)
-            .filter(TempMailUsers.id == chat_id)
-            .first()
-        )
-        login_name, domain = temp_mail[0].split("@")
-        if temp_mail not in total_inbox_dict:
-            total_inbox_dict[temp_mail] = 0
-        try:
-            get_inbox = requests.get(
-                f"https://www.1secmail.com/api/v1/?action=getMessages&login={login_name}&domain={domain}"
-            )
-        except:
-            pass
-        else:
-            if len(get_inbox.json()) > total_inbox_dict[temp_mail]:
-                markup = types.InlineKeyboardMarkup()
-                btn = types.InlineKeyboardButton(
-                    "Check Inbox 📨", callback_data=f"check inbox_{temp_mail[0]}"
-                )
-                markup.add(btn)
-                bot.send_message(
-                    chat_id,
-                    "<b>New Inbox Message Alert 💬</b>",
-                    reply_markup=markup,
-                    parse_mode="HTML",
-                )
-                new_inboxes = len(get_inbox.json()) - total_inbox_dict[temp_mail]
-                total_inbox_dict[temp_mail] += new_inboxes
-            time.sleep(delay)
+        with lock:
+            alert_dict_copy = alert_dict.copy()
+        for key, value in alert_dict_copy.items():
+            email = value["email"]
+            alert = value["alert"]
+            if alert:
+                login_name, domain = email.split("@")
+                try:
+                    get_inbox = requests.get(
+                        f"https://www.1secmail.com/api/v1/?action=getMessages&login={login_name}&domain={domain}"
+                    )
+                except:
+                    continue
+                else:
+                    with lock:
+                        if len(get_inbox.json()) > value["count"]:
+                            markup = types.InlineKeyboardMarkup()
+                            btn = types.InlineKeyboardButton(
+                                "Check Inbox 📨",
+                                callback_data=f"check inbox_{email}",
+                            )
+                            markup.add(btn)
+                            bot.send_message(
+                                key,
+                                "<b>New Message Alert 💬</b>",
+                                reply_markup=markup,
+                                parse_mode="HTML",
+                            )
+                            value["count"] = len(get_inbox.json())
+                            time.sleep(2)
 
 
-@bot.message_handler(func=lambda message: message.text == "Check Inbox")
+@bot.message_handler(func=lambda message: message.text == "Check Inbox 📨")
 def handle_check_inbox(message: types.Message):
     chat_id = message.from_user.id
     get_user = (
@@ -205,9 +239,13 @@ def handle_check_inbox(message: types.Message):
     )
     if get_user:
         if get_user.email is None:
+            markup = types.InlineKeyboardMarkup()
+            btn = types.InlineKeyboardButton("Create New Mail ➕", callback_data="here")
+            markup.add(btn)
             bot.send_message(
                 chat_id,
                 "You have no active disposable mail on your account. Kindly generate a new mail.",
+                reply_markup=markup,
             )
             return
         login_name, domain = get_user.email.split("@")
@@ -224,6 +262,12 @@ def handle_check_inbox(message: types.Message):
             if len(temp_inbox) == 0:
                 bot.send_message(chat_id, "Your inbox is empty.")
                 return
+            if get_user.alert:
+                alert_dict[chat_id] = {
+                    "email": get_user.email,
+                    "alert": get_user.alert,
+                    "count": len(temp_inbox),
+                }
             inbox_markup = types.InlineKeyboardMarkup()
             inbox_btn1 = types.InlineKeyboardButton(
                 "View Message", callback_data="view inbox message"
@@ -238,11 +282,11 @@ def handle_check_inbox(message: types.Message):
             inbox_markup.add(inbox_btn1)
             inbox_markup.add(inbox_btn2, close_btn)
             temp_inbox_list = [
-                f"<b>{index}</b>. Msg Id: <code>{inbox['id']}</code> | Subject: <b>{inbox['subject']}</b> | From: <code>{inbox['from']}</code> | Date: <b>{inbox['date']}</b>"
+                f"<b>{index}</b>. Message #: <code>{inbox['id']}</code> | Subject: <b>{inbox['subject']}</b> | From: <code>{inbox['from']}</code> | Date: <b>{inbox['date']}</b>"
                 for index, inbox in enumerate(temp_inbox, start=1)
             ]
             result_msg = (
-                f"Active Email: <code>{get_user.email}</code>\nTotal Inbox Mails: <b>{len(temp_inbox)}</b>\n\n"
+                f"➖➖➖INBOX➖➖➖\n\nActive Email: <code>{get_user.email}</code>\nTotal Inbox Mails: <b>{len(temp_inbox)}</b>\n\n"
                 + "\n\n".join(temp_inbox_list)
             )
             bot.send_message(
@@ -255,27 +299,31 @@ def handle_check_inbox(message: types.Message):
         bot.send_message(chat_id, "Sorry you have no active account with us.")
 
 
-@bot.message_handler(func=lambda message: message.text == "Show Current Email")
-def show_current_email(message: types.Message):
+@bot.message_handler(func=lambda message: message.text == "Settings ⚙️")
+def handle_settings(message: types.Message):
     chat_id = message.from_user.id
     get_user = (
         db_session.query(TempMailUsers).filter(TempMailUsers.id == chat_id).first()
     )
-    if get_user.email is not None:
-        bot.send_message(
-            chat_id, f"Active Email: <code>{get_user.email}</code>", parse_mode="HTML"
-        )
-    else:
-        bot.send_message(
-            chat_id,
-            "You have no active disposable email. Kindly generate a new mail.",
-        )
+    markup = types.InlineKeyboardMarkup()
+    close_btn = types.InlineKeyboardButton(
+        "Close \u274C", callback_data="remove message"
+    )
+    btn = types.InlineKeyboardButton(
+        "Toggle Message Alert 🔄", callback_data="toggle message alert"
+    )
+    markup.add(btn)
+    markup.add(close_btn)
+    status = {True: "ON ✅", False: "OFF ❌"}
+    result_msg = f"""
+➖➖SETTINGS➖➖
 
-
-@bot.message_handler(func=lambda message: message.text == "Support")
-def handle_support(message: types.Message):
-    chat_id = message.from_user.id
-    bot.send_message(message.from_user.id, "Contact support here @yeptg")
+👨‍💻 ID: <code>{chat_id}</code>
+✉️ Current Mail: <code>{get_user.email}</code>
+💬 Incoming Message Alert: <b>{status[get_user.alert]}</b>
+🗓️ Registered On: <b>{get_user.created_at.strftime('%Y-%m-%d %H:%M')}</b>
+    """
+    bot.send_message(chat_id, result_msg, reply_markup=markup, parse_mode="HTML")
 
 
 bot.infinity_polling()

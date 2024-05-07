@@ -9,6 +9,7 @@ def refresh_inbox(
     msg_id: int,
     button_data: str,
     call_id: int,
+    alert_dict: dict,
 ):
     temp_mail = button_data.split("_")[2]
     prev_temps = button_data.split("_")[1]
@@ -25,6 +26,13 @@ def refresh_inbox(
     else:
         if get_inbox.status_code == 200:
             temp_inbox = get_inbox.json()
+            if prev_temps == len(temp_inbox):
+                bot.answer_callback_query(
+                    call_id, "No new messages yet.", show_alert=True
+                )
+                return
+            alert_dict[chat_id]["email"] = temp_mail
+            alert_dict[chat_id]["count"] = len(temp_inbox)
             inbox_markup = types.InlineKeyboardMarkup()
             inbox_btn1 = types.InlineKeyboardButton(
                 "View Message", callback_data="view inbox message"
@@ -42,22 +50,17 @@ def refresh_inbox(
                 f"<b>{index}</b>. Msg Id: <code>{inbox['id']}</code> | Subject: <b>{inbox['subject']}</b> | From: <code>{inbox['from']}</code> | Date: <b>{inbox['date']}</b>"
                 for index, inbox in enumerate(temp_inbox, start=1)
             ]
-            if prev_temps == len(temp_inbox):
-                bot.answer_callback_query(
-                    call_id, "No new messages yet.", show_alert=True
-                )
-            else:
-                result_msg = (
-                    f"Active Email: <code>{temp_mail}</code>\nTotal Inbox Mails: <b>{len(temp_inbox)}</b>\n\n"
-                    + "\n\n".join(temp_inbox_list)
-                )
-                bot.edit_message_text(
-                    result_msg,
-                    chat_id,
-                    msg_id,
-                    reply_markup=inbox_markup,
-                    parse_mode="HTML",
-                )
+            result_msg = (
+                f"➖➖➖INBOX➖➖➖\n\nActive Email: <code>{temp_mail}</code>\nTotal Inbox Mails: <b>{len(temp_inbox)}</b>\n\n"
+                + "\n\n".join(temp_inbox_list)
+            )
+            bot.edit_message_text(
+                result_msg,
+                chat_id,
+                msg_id,
+                reply_markup=inbox_markup,
+                parse_mode="HTML",
+            )
         else:
             bot.edit_message_text(
                 "Error refreshing inbox. Please try recheck the inbox.", chat_id, msg_id

@@ -12,6 +12,7 @@ def change_mail(
     db_session: Session,
     button_data: str,
     duplicate_mails: dict,
+    alert_dict: dict,
 ):
     prev_mail = button_data.split("_")[1]
     if chat_id in duplicate_mails:
@@ -70,12 +71,17 @@ def change_mail(
                     )
                 else:
                     bot.edit_message_text(
-                        f"New Mail: <code>{user_temp_mail}</code>",
+                        f"➖➖CHANGED MAIL➖➖\n\nNew Mail: <code>{user_temp_mail}</code>\nIncoming Message Alert: <b>ON ✅</b>\n\n<i>You can always go to [settings] to see your active mail and toggle message alert mode.</i>",
                         chat_id,
                         msg_id,
                         reply_markup=gen_email_markup,
                         parse_mode="HTML",
                     )
+                    alert_dict[chat_id] = {
+                        "email": user_temp_mail,
+                        "alert": True,
+                        "count": 0,
+                    }
         else:
             bot.edit_message_text(
                 "Bot can't generate emails right now. Please try again.",

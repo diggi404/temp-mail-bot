@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, TIMESTAMP, BIGINT
+from sqlalchemy import Column, Integer, String, TIMESTAMP, BIGINT, Boolean
 from sqlalchemy.orm import declarative_base
 from datetime import datetime
 
@@ -11,5 +11,6 @@ class TempMailUsers(Base):
     email = Column(String, nullable=True)
     name = Column(String, nullable=False)
     username = Column(String, nullable=True)
+    alert = Column(Boolean, nullable=False, default=True)
     created_at = Column(TIMESTAMP, nullable=False, default=datetime.utcnow)
     updated_at = Column(TIMESTAMP, nullable=False, onupdate=datetime.utcnow)
