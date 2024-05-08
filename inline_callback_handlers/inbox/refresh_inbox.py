@@ -30,6 +30,7 @@ def refresh_inbox(
                 bot.answer_callback_query(
                     call_id, "No new messages yet.", show_alert=True
                 )
+                alert_dict[chat_id]["count"] = len(temp_inbox)
                 return
             alert_dict[chat_id]["email"] = temp_mail
             alert_dict[chat_id]["count"] = len(temp_inbox)

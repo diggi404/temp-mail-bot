@@ -203,7 +203,7 @@ def handle_new_email(message: types.Message):
                 try:
                     session.query(TempMailUsers).filter(
                         TempMailUsers.id == chat_id
-                    ).update({"email": user_temp_mail})
+                    ).update({"email": user_temp_mail, "alert": True})
                     session.commit()
                 except Exception as e:
                     print(e)
@@ -292,6 +292,7 @@ def handle_check_inbox(message: types.Message):
             temp_inbox = get_inbox.json()
             if len(temp_inbox) == 0:
                 bot.send_message(chat_id, "Your inbox is empty.")
+                alert_dict[chat_id]["count"] = 0
                 return
             if get_user.alert:
                 alert_dict[chat_id] = {

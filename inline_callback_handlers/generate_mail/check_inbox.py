@@ -24,6 +24,7 @@ def gen_check_inbox(
         temp_inbox = get_inbox.json()
         if len(temp_inbox) == 0:
             bot.answer_callback_query(call_id, "Your inbox is empty.", show_alert=True)
+            alert_dict[chat_id]["count"] = 0
             return
         alert_dict[chat_id]["email"] = temp_mail
         alert_dict[chat_id]["count"] = len(temp_inbox)

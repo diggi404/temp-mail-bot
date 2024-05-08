@@ -49,7 +49,7 @@ def create_new_mail(
                 try:
                     session.query(TempMailUsers).filter(
                         TempMailUsers.id == chat_id
-                    ).update({"email": user_temp_mail})
+                    ).update({"email": user_temp_mail, "alert": True})
                     session.commit()
                 except Exception as e:
                     print(e)
