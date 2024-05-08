@@ -2,7 +2,7 @@ import time
 from telebot import types, TeleBot
 import os
 from sqlalchemy.orm import Session
-from sqlalchemy import exists
+from sqlalchemy import exists, func
 from dotenv import load_dotenv
 from keyboards import hard_buttons
 from database.conn import db_session
@@ -23,11 +23,17 @@ from inline_callback_handlers.generate_mail.check_inbox import gen_check_inbox
 
 from inline_callback_handlers.toggle_alert import toggle_alert
 
+from inline_callback_handlers.users.move_back_users import move_back_users
+from inline_callback_handlers.users.move_fwd_users import move_fwd_users
+from inline_callback_handlers.users.show_users import show_users
+from inline_callback_handlers.users.user_info import user_info
+
 bot = TeleBot(os.getenv("BOT_TOKEN"))
 
 duplicate_mails = dict()
 alert_check = dict()
 alert_dict = dict()
+users_page_dict = dict()
 
 
 @bot.message_handler(commands=["start"])
@@ -37,12 +43,17 @@ def handle_start(message: types.Message):
     username = message.from_user.username
     get_user = db_session.query(exists().where(TempMailUsers.id == chat_id)).scalar()
     if get_user:
-        bot.send_message(
-            chat_id,
-            f"👋 Hey {name} happy to see you again. Always use disposable emails when necessary to avoid email spams.",
-            parse_mode="HTML",
-            reply_markup=hard_buttons.main_markup,
-        )
+        if chat_id == int(os.getenv("ADMIN_ID")):
+            bot.send_message(
+                chat_id, "Welcome admin.", reply_markup=hard_buttons.admin_markup
+            )
+        else:
+            bot.send_message(
+                chat_id,
+                f"👋 Hey {name} happy to see you again. Always use disposable emails when necessary to avoid email spams.",
+                parse_mode="HTML",
+                reply_markup=hard_buttons.main_markup,
+            )
     else:
         with db_session as session:
             try:
@@ -132,6 +143,18 @@ def handle_callback_query(call: types.CallbackQuery):
 
     elif button_data == "toggle message alert":
         toggle_alert(bot, chat_id, msg_id, db_session, alert_dict)
+
+    elif button_data == "get users" or button_data == "go back to users":
+        show_users(bot, chat_id, msg_id, db_session, users_page_dict)
+
+    elif button_data == "users move back":
+        move_back_users(bot, chat_id, msg_id, db_session, users_page_dict)
+
+    elif button_data == "users move forward":
+        move_fwd_users(bot, chat_id, msg_id, db_session, users_page_dict)
+
+    elif button_data.startswith("normal user_"):
+        user_info(bot, chat_id, msg_id, db_session, button_data)
 
     bot.answer_callback_query(call.id)
 
@@ -324,6 +347,22 @@ def handle_settings(message: types.Message):
 🗓️ Registered On: <b>{get_user.created_at.strftime('%Y-%m-%d %H:%M')}</b>
     """
     bot.send_message(chat_id, result_msg, reply_markup=markup, parse_mode="HTML")
+
+
+@bot.message_handler(func=lambda message: message.text == "Users 👥")
+def handle_users(message: types.Message):
+    chat_id = message.from_user.id
+    total_users = db_session.query(func.count(TempMailUsers.id)).scalar()
+    markup = types.InlineKeyboardMarkup()
+    btn = types.InlineKeyboardButton(
+        f"Total Users ({total_users})", callback_data="get users"
+    )
+    close_btn = types.InlineKeyboardButton(
+        "Close \u274C", callback_data="remove message"
+    )
+    markup.add(btn)
+    markup.add(close_btn)
+    bot.send_message(chat_id, "➖➖USERS➖➖", reply_markup=markup)
 
 
 bot.infinity_polling()
