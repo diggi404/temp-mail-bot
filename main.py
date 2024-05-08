@@ -29,7 +29,7 @@ from inline_callback_handlers.users.move_fwd_users import move_fwd_users
 from inline_callback_handlers.users.show_users import show_users
 from inline_callback_handlers.users.user_info import user_info
 
-bot = TeleBot(os.getenv("DEV_BOT"))
+bot = TeleBot(os.getenv("BOT_TOKEN"))
 
 duplicate_mails = dict()
 alert_check = dict()
