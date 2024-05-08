@@ -20,6 +20,7 @@ from inline_callback_handlers.inbox.refresh_inbox import refresh_inbox
 
 from inline_callback_handlers.generate_mail.change_mail import change_mail
 from inline_callback_handlers.generate_mail.check_inbox import gen_check_inbox
+from inline_callback_handlers.generate_mail.create_new_mail import create_new_mail
 
 from inline_callback_handlers.toggle_alert import toggle_alert
 
@@ -28,7 +29,7 @@ from inline_callback_handlers.users.move_fwd_users import move_fwd_users
 from inline_callback_handlers.users.show_users import show_users
 from inline_callback_handlers.users.user_info import user_info
 
-bot = TeleBot(os.getenv("BOT_TOKEN"))
+bot = TeleBot(os.getenv("DEV_BOT"))
 
 duplicate_mails = dict()
 alert_check = dict()
@@ -156,6 +157,9 @@ def handle_callback_query(call: types.CallbackQuery):
     elif button_data.startswith("normal user_"):
         user_info(bot, chat_id, msg_id, db_session, button_data)
 
+    elif button_data == "create new mail":
+        create_new_mail(bot, chat_id, msg_id, db_session, alert_dict, call.id)
+
     bot.answer_callback_query(call.id)
 
 
@@ -164,7 +168,7 @@ def handle_new_email(message: types.Message):
     chat_id = message.from_user.id
     try:
         get_emails = requests.get(
-            "https://www.1secmail.com/api/v1/?action=genRandomMailbox&count=10"
+            "https://www.1secmail.com/api/v1/?action=genRandomMailbox&count=20"
         )
     except:
         bot.send_message(
@@ -172,14 +176,16 @@ def handle_new_email(message: types.Message):
         )
     else:
         if get_emails.status_code == 200:
-            temp_list = get_emails.json()
+            res = get_emails.json()
+            domains = ["vjuum.com", "laafd.com"]
+            emails = [e for e in res if e.split("@")[1] in domains]
             check_temp = [
                 user.email
                 for user in db_session.query(TempMailUsers)
-                .filter(TempMailUsers.email.in_(temp_list))
+                .filter(TempMailUsers.email.in_(emails))
                 .all()
             ]
-            available_mails = set(temp_list) - set(check_temp)
+            available_mails = set(emails) - set(check_temp)
             user_temp_mail = list(available_mails)[0]
             gen_email_markup = types.InlineKeyboardMarkup()
             gen_email_btn1 = types.InlineKeyboardButton(
@@ -263,7 +269,9 @@ def handle_check_inbox(message: types.Message):
     if get_user:
         if get_user.email is None:
             markup = types.InlineKeyboardMarkup()
-            btn = types.InlineKeyboardButton("Create New Mail ➕", callback_data="here")
+            btn = types.InlineKeyboardButton(
+                "Create New Mail ➕", callback_data="create new mail"
+            )
             markup.add(btn)
             bot.send_message(
                 chat_id,
