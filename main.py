@@ -103,8 +103,8 @@ def handle_start(message: types.Message):
                 time.sleep(1)
         threads = list()
         lock = Lock()
-        for i in range(1):
-            t = Thread(target=alert_system, args=(lock,))
+        for user in all_users:
+            t = Thread(target=alert_system, args=(lock, user.id))
             threads.append(t)
 
         for t in threads:
@@ -226,38 +226,36 @@ def handle_new_email(message: types.Message):
             )
 
 
-def alert_system(lock: Lock):
+def alert_system(lock: Lock, user_id: int):
     while True:
-        with lock:
-            alert_dict_copy = alert_dict.copy()
-        for key, value in alert_dict_copy.items():
-            email = value["email"]
-            alert = value["alert"]
-            if alert:
-                login_name, domain = email.split("@")
-                try:
-                    get_inbox = requests.get(
-                        f"https://www.1secmail.com/api/v1/?action=getMessages&login={login_name}&domain={domain}"
-                    )
-                except:
-                    continue
-                else:
-                    with lock:
-                        if len(get_inbox.json()) > value["count"]:
-                            markup = types.InlineKeyboardMarkup()
-                            btn = types.InlineKeyboardButton(
-                                "Check Inbox 📨",
-                                callback_data=f"check inbox_{email}",
-                            )
-                            markup.add(btn)
-                            bot.send_message(
-                                key,
-                                "<b>New Message Alert 💬</b>",
-                                reply_markup=markup,
-                                parse_mode="HTML",
-                            )
-                            value["count"] = len(get_inbox.json())
-                            time.sleep(2)
+        alert_details = alert_dict[user_id]
+        email = alert_details["email"]
+        alert = alert_details["alert"]
+        if alert:
+            login_name, domain = email.split("@")
+            try:
+                get_inbox = requests.get(
+                    f"https://www.1secmail.com/api/v1/?action=getMessages&login={login_name}&domain={domain}"
+                )
+            except:
+                continue
+            else:
+                with lock:
+                    if len(get_inbox.json()) > alert_details["count"]:
+                        markup = types.InlineKeyboardMarkup()
+                        btn = types.InlineKeyboardButton(
+                            "Check Inbox 📨",
+                            callback_data=f"check inbox_{email}",
+                        )
+                        markup.add(btn)
+                        bot.send_message(
+                            user_id,
+                            "<b>New Message Alert 💬</b>",
+                            reply_markup=markup,
+                            parse_mode="HTML",
+                        )
+                        alert_details["count"] = len(get_inbox.json())
+                        time.sleep(2)
 
 
 @bot.message_handler(func=lambda message: message.text == "Check Inbox 📨")
