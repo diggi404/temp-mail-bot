@@ -1,6 +1,6 @@
 SQLAlchemy
 pyTelegramBotAPI
-psycopg2
+psycopg2-binary
 pysocks
 python-dotenv
 weasyprint
