@@ -27,8 +27,7 @@ def move_fwd_users(
                 f"{index}. {user[1]}", callback_data=f"normal user_{user[0]}"
             )
             temp_markups.append(btn)
-        else:
-            break
+
     for m in temp_markups:
         markup.add(m)
     left_btn = types.InlineKeyboardButton("<", callback_data="users move back")
