@@ -23,7 +23,7 @@ def create_new_mail(
     else:
         if get_emails.status_code == 200:
             res = get_emails.json()
-            domains = ["vjuum.com", "laafd.com"]
+            domains = ["vjuum.com", "laafd.com", "rteet.com", "dpptd.com"]
             emails = [e for e in res if e.split("@")[1] in domains]
             check_temp = [
                 user.email
