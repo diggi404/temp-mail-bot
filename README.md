@@ -9,4 +9,4 @@
 
 - Incoming Message Alert 💬
 
-  > Emails generated within 30 mins will receive alert for any incoming message. Always generate new email when you are ready to use for this feature to work. This feature can be either turned on or off using the settings button.
+  > Emails generated within 30 mins will receive alert for any incoming message. Always generate new email when you are ready to use for this feature to work. This feature can be either turned on or off using the settings button
